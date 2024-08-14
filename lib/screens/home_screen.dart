@@ -5,6 +5,7 @@ import 'package:streaksmate/screens/add_streaks_screen.dart';
 import 'package:streaksmate/screens/drawer_screen.dart';
 import 'package:streaksmate/services/db_service.dart';
 import 'package:streaksmate/utils/colors.dart';
+import 'package:streaksmate/utils/constants.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -25,6 +26,12 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   @override
+  void initState() {
+    updateStreakList();
+    super.initState();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       key: key,
@@ -33,9 +40,16 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           children: [
             headerSection(),
-            const TotalStreaksWidget(),
+            TotalStreaksWidget(
+              streaks: _streakList,
+            ),
             AllStreaks(
               allstreaks: _streakList,
+              onUpdate: () {
+                setState(() {
+                  updateStreakList();
+                });
+              },
             ),
           ],
         ),
@@ -103,25 +117,59 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-class TotalStreaksWidget extends StatelessWidget {
-  const TotalStreaksWidget({super.key});
+class TotalStreaksWidget extends StatefulWidget {
+  final List<Streak> streaks;
+  const TotalStreaksWidget({super.key, required this.streaks});
+
+  @override
+  State<TotalStreaksWidget> createState() => _TotalStreaksWidgetState();
+}
+
+class _TotalStreaksWidgetState extends State<TotalStreaksWidget> {
+  Map<String, dynamic> aggregated = {};
+  Map<String, dynamic> aggregateData(List<Streak> items) {
+    int totalGoals = 0;
+    Set<String> allDates = {};
+
+    for (var item in items) {
+      totalGoals += item.goal;
+      allDates.addAll(item.dates);
+    }
+    List<String> sortedDates = allDates.toList()..sort();
+    aggregated = {
+      'totalGoals': totalGoals,
+      'dates': sortedDates,
+    };
+    setState(() {});
+    return {
+      'totalGoals': totalGoals,
+      'dates': sortedDates,
+    };
+  }
 
   @override
   Widget build(BuildContext context) {
+    int totalGoals = 0;
+    int addedGoal = 0;
+    for (var item in widget.streaks) {
+      totalGoals += item.goal;
+      addedGoal += item.dates.length;
+    }
+
     return Column(
       children: [
-        const Row(
+        Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
             StreakWidget(
               color: AppColors.redColor,
               title: "Total Streaks",
-              total: "10",
+              total: totalGoals.toString(),
             ),
             StreakWidget(
               color: AppColors.redColor,
               title: "Added Streaks",
-              total: "23",
+              total: addedGoal.toString(),
             ),
           ],
         ),
@@ -136,7 +184,7 @@ class TotalStreaksWidget extends StatelessWidget {
           child: Column(
             children: [
               Text(
-                "100",
+                (totalGoals - addedGoal).toString(),
                 style: Theme.of(context).textTheme.headlineLarge!.copyWith(
                       fontWeight: FontWeight.w900,
                       fontSize: 40.0,
@@ -204,10 +252,16 @@ class StreakWidget extends StatelessWidget {
 
 class AllStreaks extends StatelessWidget {
   final List<Streak> allstreaks;
-  const AllStreaks({super.key, required this.allstreaks});
+  final VoidCallback onUpdate;
+  const AllStreaks({
+    super.key,
+    required this.allstreaks,
+    required this.onUpdate,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final DbProvider dbProvider = DbProvider();
     return allstreaks.isEmpty
         ? Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -225,18 +279,31 @@ class AllStreaks extends StatelessWidget {
                   color: AppColors.redColor,
                 ),
               ),
-              Container(
-                margin: const EdgeInsets.all(15.0),
-                height: 50.0,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(10.0),
-                  color: AppColors.redColor,
-                ),
-                child: const Center(
-                  child: Text(
-                    "Add new streaks",
-                    style: TextStyle(color: AppColors.secondaryColor),
+              InkWell(
+                onTap: () async {
+                  if (await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const AddStreaksScreen(),
+                        ),
+                      ) !=
+                      0) {
+                    onUpdate();
+                  }
+                },
+                child: Container(
+                  margin: const EdgeInsets.all(15.0),
+                  height: 50.0,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(10.0),
+                    color: AppColors.redColor,
+                  ),
+                  child: const Center(
+                    child: Text(
+                      "Add new streaks",
+                      style: TextStyle(color: AppColors.secondaryColor),
+                    ),
                   ),
                 ),
               ),
@@ -264,70 +331,108 @@ class AllStreaks extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Container(
-                              margin: const EdgeInsets.symmetric(vertical: 15.0),
-                              width: double.infinity,
-                              height: 100.0,
-                              decoration: BoxDecoration(
-                                color: AppColors.redColor.withOpacity(0.4),
-                                borderRadius: BorderRadius.circular(
-                                  10.0,
+                            GestureDetector(
+                              onLongPress: () async {
+                                print("pressed");
+                                await dbProvider.delete(allstreaks[index]).then((value) {
+                                  onUpdate();
+                                });
+                              },
+                              onTap: () async {
+                                List<String> dates = allstreaks[index].dates;
+                                if (!dates.contains(DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day).toString())) {
+                                  dates.add(
+                                    DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day).toString(),
+                                  );
+                                  Streak streak = Streak.withId(
+                                    allstreaks[index].id,
+                                    allstreaks[index].title,
+                                    allstreaks[index].goal,
+                                    dates,
+                                    allstreaks[index].icon,
+                                  );
+                                  await dbProvider.update(streak).then((value) {
+                                    onUpdate();
+                                  });
+                                }
+                              },
+                              child: Container(
+                                margin: const EdgeInsets.symmetric(vertical: 8.0),
+                                width: double.infinity,
+                                decoration: BoxDecoration(
+                                  color: allstreaks[index].dates.contains(
+                                            DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day).toString(),
+                                          )
+                                      ? AppColors.redColor
+                                      : AppColors.redColor.withOpacity(0.5),
+                                  borderRadius: BorderRadius.circular(
+                                    10.0,
+                                  ),
                                 ),
-                              ),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    margin: const EdgeInsets.symmetric(horizontal: 10.0),
-                                    height: 80.0,
-                                    width: 80.0,
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(10.0),
-                                      color: AppColors.primaryColor,
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      margin: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 10.0),
+                                      height: 80.0,
+                                      width: 80.0,
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(10.0),
+                                        color: AppColors.primaryColor,
+                                      ),
+                                      child: Icon(
+                                        AppConst.iconList[allstreaks[index].icon],
+                                        color: AppColors.secondaryColor,
+                                      ),
                                     ),
-                                    child: const Icon(
-                                      Icons.book,
-                                      color: AppColors.secondaryColor,
-                                    ),
-                                  ),
-                                  const Padding(
-                                    padding: EdgeInsets.symmetric(vertical: 10.0),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          "Snapchat",
-                                          style: TextStyle(
-                                            fontSize: 16.0,
-                                            color: AppColors.secondaryColor,
-                                          ),
+                                    Expanded(
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(vertical: 10.0),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              allstreaks[index].title,
+                                              style: const TextStyle(
+                                                fontSize: 16.0,
+                                                color: AppColors.secondaryColor,
+                                              ),
+                                            ),
+                                            const Gap(10.0),
+                                            SizedBox(
+                                              width: 200.0,
+                                              child: LinearProgressIndicator(
+                                                value: allstreaks[index].dates.length / allstreaks[index].goal,
+                                                valueColor: const AlwaysStoppedAnimation(AppColors.primaryColor),
+                                              ),
+                                            ),
+                                            const Gap(10.0),
+                                            const Text(
+                                              "Tap to complete streak,",
+                                              style: TextStyle(
+                                                color: AppColors.secondaryColor,
+                                              ),
+                                            ),
+                                            const Text(
+                                              "Long press to delete",
+                                              style: TextStyle(
+                                                color: AppColors.secondaryColor,
+                                              ),
+                                            ),
+                                          ],
                                         ),
-                                        Gap(10.0),
-                                        SizedBox(
-                                          width: 200.0,
-                                          child: LinearProgressIndicator(
-                                            value: 60 / 100,
-                                            valueColor: AlwaysStoppedAnimation(AppColors.primaryColor),
-                                          ),
-                                        ),
-                                        Gap(10.0),
-                                        Text(
-                                          "Yes, you can do it.",
-                                          style: TextStyle(
-                                            color: AppColors.secondaryColor,
-                                          ),
-                                        ),
-                                      ],
+                                      ),
                                     ),
-                                  ),
-                                  const Gap(20.0),
-                                  const Text(
-                                    "20",
-                                    style: TextStyle(
-                                      color: AppColors.secondaryColor,
-                                      fontSize: 22.0,
+                                    const Gap(20.0),
+                                    Text(
+                                      "${allstreaks[index].dates.length}/${allstreaks[index].goal}",
+                                      style: const TextStyle(
+                                        color: AppColors.secondaryColor,
+                                        fontSize: 22.0,
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                    const Gap(20.0),
+                                  ],
+                                ),
                               ),
                             ),
                           ],

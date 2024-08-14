@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:path/path.dart' as path;
 import 'package:sqflite/sqflite.dart';
 import 'package:streaksmate/models/streaks_model.dart';
@@ -27,11 +29,11 @@ class DbProvider {
     final database = openDatabase(
       path.join(
         await getDatabasesPath(),
-        'streak.db',
+        'streaks.db',
       ),
       onCreate: (db, version) {
         return db.execute(
-          'CREATE TABLE $tableName(id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, goal INTEGER)',
+          'CREATE TABLE $tableName(id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, dates TEXT, goal INTEGER, icon INTEGER)',
         );
       },
       version: 1,
@@ -50,12 +52,13 @@ class DbProvider {
           maps[i]['id'],
           maps[i]['title'],
           maps[i]['goal'],
+          List<String>.from(jsonDecode(maps[i]['dates'])),
+          maps[i]['icon'],
         );
       },
     );
   }
 
-  // insert operation
   Future<int> insertStreak(Streak streak) async {
     final Database db = await database;
     int result = await db.insert(
@@ -63,5 +66,24 @@ class DbProvider {
       streak.toMap(),
     );
     return result;
+  }
+
+  Future<int> update(Streak streak) async {
+    final db = await database;
+    return await db.update(
+      tableName,
+      streak.toMap(),
+      where: 'id = ?',
+      whereArgs: [streak.id],
+    );
+  }
+
+  Future<int> delete(Streak streak) async {
+    final db = await database;
+    return await db.delete(
+      tableName,
+      where: 'id = ?',
+      whereArgs: [streak.id],
+    );
   }
 }

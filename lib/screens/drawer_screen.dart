@@ -17,12 +17,12 @@ class CustomDrawer extends StatelessWidget {
     }
 
     void launchWebsite() {
-      const url = 'https://moodtrackers.blogspot.com/2024/08/mood-tracker-privacy-policy.html';
+      const url = 'https://streaksmate.blogspot.com/2024/08/streaks-mate-privacy-policy.html';
       launchURL(url);
     }
 
     void launchAppStore() {
-      Share.share("""You can find Mood Trackers https://apps.apple.com/store/apps/details?id=com.habib.moodTracker""");
+      Share.share("""You can find Streaks Mate https://apps.apple.com/store/apps/details?id=com.irfan.streaksmate""");
     }
 
     return Container(
@@ -34,13 +34,13 @@ class CustomDrawer extends StatelessWidget {
             ClipRRect(
               borderRadius: BorderRadius.circular(10.0),
               child: Image.asset(
-                "assets/mood_tracker_icon.png",
+                "assets/app_icon.png",
                 width: 50.0,
                 height: 50.0,
               ),
             ),
             const Text(
-              "Mood Trackers",
+              "Streaks Mate",
               style: TextStyle(
                 fontSize: 24.0,
                 color: AppColors.primaryColor,

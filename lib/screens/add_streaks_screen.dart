@@ -19,11 +19,11 @@ class AddStreaksScreen extends StatefulWidget {
 class _AddStreaksScreenState extends State<AddStreaksScreen> {
   final DbProvider _dbProvider = DbProvider();
   final _textFieldController = TextEditingController();
+  final _titleController = TextEditingController();
   int _currentIconIndex = 0;
   bool _showCursor = true;
   bool _check = false;
   Color _checkColor = AppColors.primaryColor;
-  final String _titleText = "";
   final key = GlobalKey<FormState>();
   @override
   void initState() {
@@ -134,7 +134,7 @@ class _AddStreaksScreenState extends State<AddStreaksScreen> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: <Widget>[
                         CustomTextField(
-                          controller: _textFieldController,
+                          controller: _titleController,
                           labelText: "Add your title",
                           validator: (value) {
                             if (value == null || value == "") {
@@ -246,8 +246,10 @@ class _AddStreaksScreenState extends State<AddStreaksScreen> {
                       onTap: () async {
                         if (key.currentState!.validate()) {
                           Streak streak = Streak(
-                            _titleText,
+                            _titleController.text,
                             int.parse(_textFieldController.text),
+                            [],
+                            _currentIconIndex,
                           );
                           await _insertStreak(streak).then((result) {
                             Navigator.pop(context, result);
